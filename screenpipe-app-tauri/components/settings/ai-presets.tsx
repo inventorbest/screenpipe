@@ -440,8 +440,8 @@ const AISection = ({
               !settings.user
                 ? "login required"
                 : !settings.user?.credits?.amount
-                ? "requires credits"
-                : undefined
+                  ? "requires credits"
+                  : undefined
             }
           />
 
@@ -571,12 +571,12 @@ const AISection = ({
                 }
               >
                 {settingsPreset?.provider === "openai" &&
-                !settingsPreset?.apiKey
+                  !settingsPreset?.apiKey
                   ? "api key required to fetch models"
                   : settingsPreset?.provider === "screenpipe-cloud" &&
                     (!settings.user || settings.user.cloud_subscribed === false)
-                  ? "subscription required to access models"
-                  : settingsPreset?.model || "select model..."}
+                    ? "subscription required to access models"
+                    : settingsPreset?.model || "select model..."}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -654,8 +654,8 @@ const AISection = ({
                   <p>
                     maximum number of characters (think 4 characters per token)
                     to send to the ai model. <br />
-                    usually, openai models support up to 200k tokens, which is
-                    roughly 1m characters. <br />
+                    some models support up to 500k tokens, which is
+                    roughly 2m characters. <br />
                     we&apos;ll use this for UI purposes to show you how much you
                     can send.
                   </p>
@@ -667,7 +667,7 @@ const AISection = ({
             <Slider
               id="aiMaxContextChars"
               min={10000}
-              max={1000000}
+              max={2000000}
               step={10000}
               value={
                 settingsPreset?.maxContextChars

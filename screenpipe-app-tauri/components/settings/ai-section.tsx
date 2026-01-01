@@ -93,7 +93,7 @@ export const AIProviderCard = ({
             className={cn(
               "rounded-lg shrink-0 size-8",
               type === "native-ollama" &&
-                "outline outline-gray-300 outline-1 outline-offset-2",
+              "outline outline-gray-300 outline-1 outline-offset-2",
               imageClassName,
             )}
           />
@@ -461,8 +461,8 @@ const AISection = () => {
                   <p>
                     maximum number of characters (think 4 characters per token)
                     to send to the ai model. <br />
-                    usually, openai models support up to 200k tokens, which is
-                    roughly 1m characters. <br />
+                    some models support up to 500k tokens, which is
+                    roughly 2m characters. <br />
                     we&apos;ll use this for UI purposes to show you how much you
                     can send.
                   </p>
@@ -474,7 +474,7 @@ const AISection = () => {
             <Slider
               id="aiMaxContextChars"
               min={10000}
-              max={1000000}
+              max={2000000}
               step={10000}
               value={[settings.aiMaxContextChars]}
               onValueChange={handleMaxContextCharsChange}
