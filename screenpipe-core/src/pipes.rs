@@ -1691,7 +1691,17 @@ pub async fn download_pipe_private(
     debug!("downloading zip file from: {}", source);
     let client = Client::new();
     let response = match client.get(source).send().await {
-        Ok(res) => res,
+        Ok(res) => {
+            // Check HTTP status before proceeding
+            if !res.status().is_success() {
+                let status = res.status();
+                let err_msg = format!("Download failed: HTTP {}", status.as_u16());
+                error!("{}", err_msg);
+                cleanup_temp(&temp_dir, &temp_dir.join("temp.zip")).await?;
+                return Err(anyhow::anyhow!(err_msg));
+            }
+            res
+        }
         Err(e) => {
             let err_msg = format!("Failed to download zip: {}", e);
             error!("{}", err_msg);
