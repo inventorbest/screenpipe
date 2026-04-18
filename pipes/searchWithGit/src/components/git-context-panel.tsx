@@ -20,9 +20,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Loader2, FolderOpen, GitBranch, User, Calendar, ChevronRight, Home } from "lucide-react";
+import { Loader2, FolderOpen, GitBranch, User, Calendar, ChevronRight, Home, X, Clock } from "lucide-react";
 import { useToast } from "@/lib/use-toast";
 import { MultiSelectCombobox, type BaseOption } from "@/components/ui/multi-select-combobox";
+import localforage from "localforage";
+
+const RECENT_PATHS_KEY = "searchWithGit-recent-paths";
+const MAX_RECENT_PATHS = 10;
 import {
   Dialog,
   DialogContent,
@@ -75,6 +79,59 @@ export function GitContextPanel({
   const [browserEntries, setBrowserEntries] = useState<Array<{name: string; path: string; hasGit: boolean}>>([]);
   const [isBrowsing, setIsBrowsing] = useState(false);
   
+  // 最近使用的路径
+  const [recentPaths, setRecentPaths] = useState<string[]>([]);
+  const [showRecentPaths, setShowRecentPaths] = useState(false);
+
+  // 加载最近使用的路径
+  useEffect(() => {
+    const loadRecentPaths = async () => {
+      try {
+        const paths = await localforage.getItem<string[]>(RECENT_PATHS_KEY);
+        if (paths && Array.isArray(paths)) {
+          setRecentPaths(paths);
+          // 如果当前路径为空且有历史记录，自动填充最近使用的路径
+          if (!rootPath && paths.length > 0) {
+            setRootPath(paths[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load recent paths:", error);
+      }
+    };
+    loadRecentPaths();
+  }, []);
+
+  // 保存路径到最近使用列表
+  const saveToRecentPaths = async (path: string) => {
+    if (!path.trim()) return;
+    
+    try {
+      const trimmedPath = path.trim();
+      // 移除重复项并将新路径添加到开头
+      const updatedPaths = [
+        trimmedPath,
+        ...recentPaths.filter((p) => p !== trimmedPath),
+      ].slice(0, MAX_RECENT_PATHS);
+      
+      await localforage.setItem(RECENT_PATHS_KEY, updatedPaths);
+      setRecentPaths(updatedPaths);
+    } catch (error) {
+      console.error("Failed to save recent path:", error);
+    }
+  };
+
+  // 删除最近使用的路径
+  const removeRecentPath = async (pathToRemove: string) => {
+    try {
+      const updatedPaths = recentPaths.filter((p) => p !== pathToRemove);
+      await localforage.setItem(RECENT_PATHS_KEY, updatedPaths);
+      setRecentPaths(updatedPaths);
+    } catch (error) {
+      console.error("Failed to remove recent path:", error);
+    }
+  };
+  
   // 获取唯一作者列表
   const uniqueAuthors = Array.from(
     new Set(commits.map((c) => c.author))
@@ -115,6 +172,9 @@ export function GitContextPanel({
       const data = await response.json();
       setRepos(data.repos || []);
       setCommits(data.commits || []);
+      
+      // 搜索成功后保存路径到最近使用列表
+      await saveToRecentPaths(rootPath.trim());
       
       toast({
         title: "成功",
@@ -201,6 +261,7 @@ export function GitContextPanel({
   const handleBrowseSelect = (selectedPath: string) => {
     setRootPath(selectedPath);
     setShowBrowser(false);
+    saveToRecentPaths(selectedPath);
   };
 
   return (
@@ -216,13 +277,56 @@ export function GitContextPanel({
         <div className="space-y-2">
           <Label htmlFor="git-root-path">Git 仓库根路径</Label>
           <div className="flex gap-2">
-            <Input
-              id="git-root-path"
-              placeholder="例如: D:\Projects 或 /home/user/projects"
-              value={rootPath}
-              onChange={(e) => setRootPath(e.target.value)}
-              className="flex-1"
-            />
+            <div className="relative flex-1">
+              <Input
+                id="git-root-path"
+                placeholder="例如: D:\Projects 或 /home/user/projects"
+                value={rootPath}
+                onChange={(e) => setRootPath(e.target.value)}
+                onFocus={() => {
+                  if (recentPaths.length > 0) setShowRecentPaths(true);
+                }}
+                onBlur={() => {
+                  // 延迟隐藏，让点击事件先触发
+                  setTimeout(() => setShowRecentPaths(false), 200);
+                }}
+                className="flex-1 w-full"
+              />
+              {/* 最近使用的路径下拉列表 */}
+              {showRecentPaths && recentPaths.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                  <div className="px-3 py-1.5 text-xs text-muted-foreground flex items-center gap-1 border-b">
+                    <Clock className="h-3 w-3" />
+                    最近使用的路径
+                  </div>
+                  {recentPaths.map((recentPath) => (
+                    <div
+                      key={recentPath}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer group text-sm"
+                      onMouseDown={(e) => {
+                        e.preventDefault(); // 阻止 blur 事件
+                        setRootPath(recentPath);
+                        setShowRecentPaths(false);
+                      }}
+                    >
+                      <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{recentPath}</span>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 shrink-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removeRecentPath(recentPath);
+                        }}
+                        title="移除此路径"
+                      >
+                        <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -241,7 +345,7 @@ export function GitContextPanel({
             </TooltipProvider>
           </div>
           <p className="text-xs text-muted-foreground">
-            直接输入路径或点击右侧按钮浏览选择。将递归扫描此路径下所有 git 仓库。
+            直接输入路径或点击右侧按钮浏览选择。{recentPaths.length > 0 ? "点击输入框查看最近使用的路径。" : ""}将递归扫描此路径下所有 git 仓库。
           </p>
         </div>
 
