@@ -344,9 +344,11 @@ export function SearchChat() {
   const [browserUrl, setBrowserUrl] = useState("");
 
   // Git commits state
-  const [gitCommits, setGitCommits] = useState<Array<{hash: string; author: string; email: string; date: string; message: string; repo: string}>>([]);
+  const [gitCommits, setGitCommits] = useState<Array<{id?: string; hash: string; author: string; email: string; date: string; message: string; repo: string; repoPath?: string}>>([]);
   const [selectedGitCommits, setSelectedGitCommits] = useState<Set<string>>(new Set());
   const [showGitPanel, setShowGitPanel] = useState(false);
+  const getGitCommitId = (commit: {id?: string; hash: string; repo: string; repoPath?: string}) =>
+    commit.id ?? `${commit.repoPath ?? commit.repo}:${commit.hash}`;
 
   useEffect(() => {
     if (Object.keys(selectedSpeakers).length > 0) {
@@ -690,7 +692,7 @@ export function SearchChat() {
 
     // 添加 git commits 的长度
     gitCommits
-      .filter((c) => selectedGitCommits.has(c.hash))
+      .filter((c) => selectedGitCommits.has(getGitCommitId(c)))
       .forEach((commit) => {
         total += JSON.stringify(commit).length;
       });
@@ -795,7 +797,7 @@ export function SearchChat() {
             screenpipeResults: selectedAgent.dataSelector(
               results.filter((_, index) => selectedResults.has(index))
             ),
-            gitCommits: gitCommits.filter((c) => selectedGitCommits.has(c.hash)),
+            gitCommits: gitCommits.filter((c) => selectedGitCommits.has(getGitCommitId(c))),
           })}
 
           User query: ${floatingInput}`,
@@ -1935,7 +1937,7 @@ export function SearchChat() {
           <GitContextPanel
             onCommitsSelected={(commits) => {
               setGitCommits(commits);
-              setSelectedGitCommits(new Set(commits.map((c) => c.hash)));
+              setSelectedGitCommits(new Set(commits.map((c) => getGitCommitId(c))));
             }}
             selectedCommits={selectedGitCommits}
           />

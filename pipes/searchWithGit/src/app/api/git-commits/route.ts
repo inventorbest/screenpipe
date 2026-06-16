@@ -12,12 +12,14 @@ export const dynamic = "force-dynamic";
 const execAsync = promisify(exec);
 
 interface GitCommit {
+  id: string;
   hash: string;
   author: string;
   email: string;
   date: string;
   message: string;
   repo: string;
+  repoPath: string;
 }
 
 interface GitRepo {
@@ -25,8 +27,42 @@ interface GitRepo {
   name: string;
 }
 
+async function resolveGitRepoPath(dir: string): Promise<string | null> {
+  const gitPath = path.join(dir, ".git");
+
+  try {
+    const stat = await fs.promises.stat(gitPath);
+    if (stat.isDirectory()) {
+      return dir;
+    }
+  } catch {
+    // 继续尝试 .git 文件形式的 worktree / submodule
+  }
+
+  try {
+    const gitFile = await fs.promises.readFile(gitPath, "utf8");
+    const match = gitFile.match(/gitdir:\s*(.+)/i);
+    if (!match) {
+      return null;
+    }
+
+    const gitDir = match[1].trim();
+    const resolvedGitDir = path.isAbsolute(gitDir)
+      ? gitDir
+      : path.resolve(dir, gitDir);
+
+    if (resolvedGitDir) {
+      return dir;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 /**
- * 递归查找目录下所有 .git 文件夹
+ * 递归查找目录下所有 git 仓库（支持 .git 文件夹和 worktree 的 .git 文件）
  */
 async function findGitRepos(rootPath: string): Promise<GitRepo[]> {
   const repos: GitRepo[] = [];
@@ -62,6 +98,14 @@ async function findGitRepos(rootPath: string): Promise<GitRepo[]> {
           } else {
             // 继续递归
             await scan(fullPath, depth + 1);
+          }
+        } else if (entry.name === '.git') {
+          const repoPath = await resolveGitRepoPath(dir);
+          if (repoPath) {
+            repos.push({
+              path: repoPath,
+              name: path.basename(dir),
+            });
           }
         }
       }
@@ -105,8 +149,10 @@ async function getGitCommits(
   }
   
   try {
+    const resolvedRepoPath = (await resolveGitRepoPath(repoPath)) ?? repoPath;
+
     const { stdout } = await execAsync(cmd, {
-      cwd: repoPath,
+      cwd: resolvedRepoPath,
       maxBuffer: 1024 * 1024 * 10, // 10MB
     });
     
@@ -120,12 +166,14 @@ async function getGitCommits(
     for (const line of lines) {
       const [hash, authorName, email, date, ...messageParts] = line.split('|');
       commits.push({
+        id: `${resolvedRepoPath}:${hash}`,
         hash,
         author: authorName,
         email,
         date,
         message: messageParts.join('|'), // 防止 message 中有 |
-        repo: path.basename(repoPath),
+        repo: path.basename(resolvedRepoPath),
+        repoPath: resolvedRepoPath,
       });
     }
     

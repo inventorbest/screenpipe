@@ -38,12 +38,14 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface GitCommit {
+  id?: string;
   hash: string;
   author: string;
   email: string;
   date: string;
   message: string;
   repo: string;
+  repoPath?: string;
 }
 
 interface GitRepo {
@@ -82,6 +84,9 @@ export function GitContextPanel({
   // 最近使用的路径
   const [recentPaths, setRecentPaths] = useState<string[]>([]);
   const [showRecentPaths, setShowRecentPaths] = useState(false);
+
+  const getCommitId = (commit: GitCommit) =>
+    commit.id ?? `${commit.repoPath ?? commit.repo}:${commit.hash}`;
 
   // 加载最近使用的路径
   useEffect(() => {
@@ -192,18 +197,18 @@ export function GitContextPanel({
     }
   };
 
-  const handleCommitToggle = (hash: string) => {
-    const commit = commits.find((c) => c.hash === hash);
+  const handleCommitToggle = (commitId: string) => {
+    const commit = commits.find((c) => getCommitId(c) === commitId);
     if (!commit) return;
 
     const newSelected = new Set(selectedCommits);
-    if (newSelected.has(hash)) {
-      newSelected.delete(hash);
+    if (newSelected.has(commitId)) {
+      newSelected.delete(commitId);
     } else {
-      newSelected.add(hash);
+      newSelected.add(commitId);
     }
 
-    const selectedCommitsList = commits.filter((c) => newSelected.has(c.hash));
+    const selectedCommitsList = commits.filter((c) => newSelected.has(getCommitId(c)));
     onCommitsSelected(selectedCommitsList);
   };
 
@@ -576,7 +581,7 @@ export function GitContextPanel({
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="select-all-commits"
-                  checked={filteredCommits.every((c) => selectedCommits.has(c.hash))}
+                  checked={filteredCommits.every((c) => selectedCommits.has(getCommitId(c)))}
                   onCheckedChange={handleSelectAll}
                 />
                 <Label htmlFor="select-all-commits" className="text-sm">
@@ -586,21 +591,24 @@ export function GitContextPanel({
             </div>
 
             <div className="max-h-[400px] overflow-y-auto space-y-2">
-              {filteredCommits.map((commit) => (
+              {filteredCommits.map((commit) => {
+                const commitId = getCommitId(commit);
+
+                return (
                 <Card
-                  key={commit.hash}
+                  key={commitId}
                   className={`cursor-pointer transition-colors ${
-                    selectedCommits.has(commit.hash)
+                    selectedCommits.has(commitId)
                       ? "border-primary bg-primary/5"
                       : ""
                   }`}
-                  onClick={() => handleCommitToggle(commit.hash)}
+                  onClick={() => handleCommitToggle(commitId)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
                       <Checkbox
-                        checked={selectedCommits.has(commit.hash)}
-                        onCheckedChange={() => handleCommitToggle(commit.hash)}
+                        checked={selectedCommits.has(commitId)}
+                        onCheckedChange={() => handleCommitToggle(commitId)}
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 space-y-1">
@@ -627,7 +635,8 @@ export function GitContextPanel({
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              );
+              })}
             </div>
           </div>
         )}
